@@ -1,0 +1,12 @@
+# Compiled class files
+out/
+
+# IDE settings folder
+.idea/
+
+# Maven/Gradle build files (gelecekte kullanırsan diye)
+build/
+target/
+
+# Log files
+*.log
