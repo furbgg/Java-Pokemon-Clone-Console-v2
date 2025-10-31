@@ -3,110 +3,132 @@ package Javamonv1;
 import Javamonv1.persistence.CsvDataManager;
 
 import java.io.IOException;
+import java.sql.Time;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class App {
-    private static final String POKE_CVS_PATH = "Pokemon.csv";
-    private static final String ATTACKS_CVS_PATH = "Attacks.csv";
-    private static final String EFF_CVS_PATH = "Effectiveness.csv";
+    private static final String POKE_CSV_PATH = "Pokemon.csv";
+    private static final String ATTACKS_CSV_PATH = "Attacks.csv";
+    private static final String EFF_CSV_PATH = "Effectiveness.csv";
     private static final String WELCOME_SOUND_PATH = "resources/aa.wav";
-    public static void main(String[] args) throws IOException , InterruptedException {
-        Scanner sc = new Scanner(System.in);
-        CsvDataManager csv = new CsvDataManager();
-        JavamonRepository javamonRepo = new JavamonRepository();
-        PokAttackeRepository attackRepo = new PokAttackeRepository();
-        EffectivenessRepository effRepo = new EffectivenessRepository();
-        KonsolenIU iu = new KonsolenIU();
-        SoundManager sm = new SoundManager();
-        SpielLogik logic;
 
-        System.out.printf("Lade CSV_Dateien ");
-        List<Javamon> javamonData = csv.loadPokemon(POKE_CVS_PATH);
-        List<PokAttacke> attackData = csv.loadPokAttacke(ATTACKS_CVS_PATH);
-        Map<String, Map<String,Double>> effData = csv.loadEffectiveness(EFF_CVS_PATH);
-        System.out.printf("Dateien erfolgreich geladen!");
-
-        javamonRepo.init(javamonData);
-        attackRepo.init(attackData);
-        effRepo.init(effData);
-        logic = new SpielLogik(javamonRepo,attackRepo,effRepo);
-        iu.displayWelcomeAnimation();;
-        sm.playSound(WELCOME_SOUND_PATH);
-        boolean again;
-        do {
-            System.out.flush();
-            TimeUnit.SECONDS.sleep(3);
+    private static void startBattle(Javamon playerMon, Javamon computerMon, SpielLogik logic, KonsolenIU iu, Scanner sc, PokAttackeRepository pok) throws InterruptedException {
+        boolean playerTurn;
+        if (playerMon.getSpeed() >= computerMon.getSpeed()) {
+            System.out.println(ConsoleColors.GREEN + playerMon.getName() + "ist schneller und beginnt");
+            playerTurn = true;
+        } else {
+            System.out.println(ConsoleColors.RED + computerMon.getName() + "ist schneller und beginnt");
+            playerTurn = false;
+        }
+        System.out.flush();
+        TimeUnit.SECONDS.sleep(3);
+        while (playerMon.getHp() > 0 && computerMon.getHp() > 0) {
             iu.clearConsole();
-            iu.displayPokemonList(javamonRepo.getAllPoke());
-            Javamon playermon = null;
-            while (playermon == null) {
-                String playerInput = iu.tryReadString("Wahle dein Javamon!",sc);
-                playermon = logic.selectPlayer(playerInput);
-                if (playermon == null) {
-                    System.out.println(ConsoleColors.RED + "Ungultige Auswahl...Bitte erneut versuchen" + ConsoleColors.RESET);
-                }
-            }
-            Javamon computerMon = logic.selectComp();
-            logic.Attackkings(playermon,4);
-            logic.Attackkings(computerMon,4);
-            iu.displaySelections(playermon,computerMon);
-            System.out.flush();
-            TimeUnit.SECONDS.sleep(2);
-            boolean playerTurn = playermon.getSpeed() >= computerMon.getSpeed();
+            iu.drawHealthBar(playerMon.getName() + "(Du)", playerMon.getHp(), playerMon.getMaxHp());
+            iu.drawHealthBar(computerMon.getName() + "( GEGNER ) ", computerMon.getHp(), computerMon.getMaxHp());
+            System.out.println();
+
+            Javamon attacker = playerTurn ? playerMon : computerMon;
+            Javamon defender = playerTurn ? computerMon : playerMon;
+            PokAttacke chosenAttack;
+
             if (playerTurn) {
-                System.out.println(ConsoleColors.GREEN + playermon.getName() + "ist schneller und beginnt!" + ConsoleColors.RESET);
-            }else {
-                System.out.println(ConsoleColors.GREEN + computerMon.getName() + "ist schneller und beginnt!" + ConsoleColors.RESET);
+                chosenAttack = iu.askForAttack(attacker, sc);
+            } else {
+                System.out.println(ConsoleColors.YELLOW + "\n Der Gegner ist am  Zug....." + ConsoleColors.RESET);
+                System.out.flush();
+                TimeUnit.MILLISECONDS.sleep(1500);
+                chosenAttack = logic.attackenRepository.getRandomAtt();
             }
-            System.out.flush();
-            TimeUnit.SECONDS.sleep(2);
+            int damage = logic.calculateDamage(chosenAttack, attacker, defender);
+            defender.setHp(defender.getHp() - damage);
+            iu.displayAttackAnimation(attacker, defender, chosenAttack, damage);
 
-            while (playermon.getHp()> 0 && computerMon.getHp()> 0 ) {
-                iu.clearConsole();
-                ;
-                iu.drawHealthBar(playermon.getName() + "DU", playermon.getHp(), playermon.getMaxHp());
-                iu.drawHealthBar(computerMon.getName() + "GEGNER", computerMon.getHp(), computerMon.getMaxHp());
-                System.out.println();
-
-                Javamon attacker = playerTurn ? playermon : computerMon;
-                Javamon defender = playerTurn ? computerMon : playermon;
-                   PokAttacke chosenAttack;
-
-                if (playerTurn) {
-                    chosenAttack = iu.askForAttack(attacker,sc);
-                } else{
-                    System.out.println(ConsoleColors.YELLOW + "\nDer Gegner ist am Zug...." + ConsoleColors.RESET);
-                    System.out.flush();
-                    TimeUnit.SECONDS.sleep(2);
-                    chosenAttack = attackRepo.getRandomAtt();
-
-                }
-
-                int damage = logic.calculateDamage(chosenAttack,attacker,defender);
-                defender.setHp(defender.getHp() - damage);
-                iu.displayAttackAnimation(attacker,defender,chosenAttack,damage);
-                TimeUnit.SECONDS.sleep(3);
-                playerTurn  = !playerTurn;
-
-            }
-
-            iu.clearConsole();
-            Javamon winner = (playermon.getHp()>0) ? playermon:computerMon;
-            Javamon loser = (playermon.getHp()>0) ? computerMon : playermon;
-
-            iu.displayWinnerAnimation(winner,loser);
             System.out.flush();
             TimeUnit.SECONDS.sleep(3);
-            again = iu.playAgain("Mochtest du noch einmal spielen?(Ja/Nein)",sc);
-
-        } while (again);
 
 
-        iu.displayClosingAnimation();
-        System.out.println("Scanner wird geschlossen... App wird beendet.");
-        sc.close();
+            playerTurn = !playerTurn;
+
+        }
 
 
     }
+
+    private static SpielLogik initializeDAta() throws IOException {
+        System.out.println("Lade CSV_DAteien");
+        CsvDataManager dataManager = new CsvDataManager();
+        JavamonRepository javamonRepo = new JavamonRepository();
+        PokAttackeRepository attackRepo = new PokAttackeRepository();
+        EffectivenessRepository effRepo = new EffectivenessRepository();
+        List<Javamon> pokemonData =  dataManager.loadPokemon(POKE_CSV_PATH);
+        Map<String, Map<String,Double>> effData = dataManager.loadEffectiveness(EFF_CSV_PATH);
+        List<PokAttacke> attackData = dataManager.loadPokAttacke(ATTACKS_CSV_PATH);
+        javamonRepo.init(pokemonData);
+        attackRepo.init(attackData);
+        effRepo.init(effData);
+
+        System.out.println("...Dateien erfolgreich geladen.");
+
+        return new SpielLogik(javamonRepo, attackRepo, effRepo);
+
+    }
+
+    private static void runGameLoop(PokAttackeRepository pok, SpielLogik logic, KonsolenIU iu, Scanner sc) throws IOException, InterruptedException {
+        CsvDataManager csv = new CsvDataManager();
+        boolean again;
+        do {
+            iu.clearConsole();
+            iu.displayPokemonList(csv.loadPokemon(POKE_CSV_PATH));
+            Javamon playerMon = null;
+            while (playerMon == null) {
+                String playerInout = iu.tryReadString("Wähle dein Javamon(ID oder NAME):", sc);
+                playerMon = logic.selectPlayer(playerInout);
+                if (playerMon == null) {
+                    System.out.println(ConsoleColors.RED + "ungultige auswahl.Bitte erneut versuchen " + ConsoleColors.RESET);
+                }
+            }
+            Javamon computerMon = logic.selectComp();
+
+            logic.Attackkings(playerMon, 4);
+            logic.Attackkings(computerMon, 4);
+            iu.displaySelections(playerMon, computerMon);
+            TimeUnit.SECONDS.sleep(4);
+
+            startBattle(playerMon, computerMon, logic, iu, sc,pok);
+            iu.clearConsole();
+            Javamon winner = (playerMon.getHp()>0 ) ? playerMon : computerMon;
+            Javamon loser = (playerMon.getHp()>0) ? computerMon :playerMon;
+            iu.displayWinnerAnimation(winner,loser);
+            TimeUnit.SECONDS.sleep(4);
+            again = iu.playAgain("Möchtest du noch einmal spielen? (Ja/Nein)" ,sc);
+        } while (again) ;
+
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        Scanner sc = new Scanner(System.in);
+        KonsolenIU iu = new KonsolenIU();
+        SoundManager sm = new SoundManager();
+        JavamonRepository ja = new JavamonRepository();
+        PokAttackeRepository pok = new PokAttackeRepository();
+
+        SpielLogik logic = initializeDAta();
+
+        iu.displayWelcomeAnimation();
+        sm.playSound(WELCOME_SOUND_PATH);
+        System.out.println("Zum Starten Enter Drücken");
+sc.nextLine();
+
+runGameLoop(pok,logic,iu,sc);
+iu.displayClosingAnimation();
+sc.close();
+        System.out.println("App wird beendet");
+
+    }
+
 }
+
+
