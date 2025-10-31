@@ -5,7 +5,7 @@ import java.util.Random;
 public class SpielLogik {
 
     private final JavamonRepository javamonRepository;
-    private final PokAttackeRepository attackenRepository;
+PokAttackeRepository attackenRepository;
     private EffectivenessRepository  effectivenessRepository;
     private final Random random = new Random(); // Rnd değeri için
 
